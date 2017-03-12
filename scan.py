@@ -23,7 +23,7 @@ from concurrent.futures import TimeoutError
 import time
 
 from sqlalchemy.exc import DBAPIError
-from aiopogo import close_sessions
+from aiopogo import close_sessions, activate_hash_server
 
 from monocle.shared import LOOP, get_logger, SessionManager, ACCOUNTS
 from monocle.utils import get_address, dump_pickle
@@ -129,17 +129,19 @@ def exception_handler(loop, context):
         print('Exception in exception handler.')
 
 
-def cleanup(overseer, manager, checker):
+def cleanup(overseer, manager):
     try:
-        checker.cancel()
+        overseer.running = False
         print('Exiting, please wait until all tasks finish')
 
         log = get_logger('cleanup')
         print('Finishing tasks...')
+
+        LOOP.create_task(overseer.exit_progress())
         pending = asyncio.Task.all_tasks(loop=LOOP)
         gathered = asyncio.gather(*pending, return_exceptions=True)
         try:
-            LOOP.run_until_complete(asyncio.wait_for(gathered, 30))
+            LOOP.run_until_complete(asyncio.wait_for(gathered, 40))
         except TimeoutError as e:
             print('Coroutine completion timed out, moving on.')
         except Exception as e:
@@ -203,19 +205,19 @@ def main():
 
     LOOP.set_exception_handler(exception_handler)
 
-    overseer = Overseer(status_bar=args.status_bar, manager=manager)
-    overseer.start()
-    checker = asyncio.ensure_future(overseer.check())
-    launcher = asyncio.ensure_future(overseer.launch(args.bootstrap, args.pickle))
+    overseer = Overseer(manager)
+    overseer.start(args.status_bar)
+    launcher = LOOP.create_task(overseer.launch(args.bootstrap, args.pickle))
+    activate_hash_server(conf.HASH_KEY)
     if platform != 'win32':
         LOOP.add_signal_handler(SIGINT, launcher.cancel)
         LOOP.add_signal_handler(SIGTERM, launcher.cancel)
     try:
         LOOP.run_until_complete(launcher)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         launcher.cancel()
     finally:
-        cleanup(overseer, manager, checker)
+        cleanup(overseer, manager)
 
 
 if __name__ == '__main__':

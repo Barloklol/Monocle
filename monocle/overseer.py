@@ -53,14 +53,13 @@ START_TIME = time.monotonic()
 
 
 class Overseer:
-    def __init__(self, status_bar, manager):
+    def __init__(self, manager):
         self.log = get_logger('overseer')
         self.workers = []
         self.manager = manager
         self.count = conf.GRID[0] * conf.GRID[1]
         self.start_date = datetime.now()
-        self.status_bar = status_bar
-        self.things_count = []
+        self.things_count = deque(maxlen=9)
         self.paused = False
         self.coroutines_count = 0
         self.skipped = 0
@@ -68,11 +67,16 @@ class Overseer:
         self.mysteries = deque()
         self.coroutine_semaphore = asyncio.Semaphore(conf.COROUTINES_LIMIT, loop=LOOP)
         self.redundant = 0
+        self.running = True
         self.all_seen = False
         self.idle_seconds = 0
+        if platform == 'win32':
+            self.clear = 'cls'
+        else:
+            self.clear = 'clear'
         self.log.info('Overseer initialized')
 
-    def start(self):
+    def start(self, status_bar):
         self.captcha_queue = self.manager.captcha_queue()
         Worker.captcha_queue = self.manager.captcha_queue()
         self.extra_queue = self.manager.extra_queue()
@@ -91,54 +95,56 @@ class Overseer:
 
         self.workers = tuple(Worker(worker_no=x) for x in range(self.count))
         DB_PROC.start()
+        LOOP.call_later(10, self.update_count)
+        LOOP.call_later(max(conf.SWAP_OLDEST, conf.MINIMUM_RUNTIME), self.swap_oldest)
+        LOOP.call_soon(self.update_stats)
+        if status_bar:
+            LOOP.call_soon(self.print_status)
 
-    async def check(self):
-        now = time.monotonic()
-        last_commit = now
-        last_things_found_updated = now
-        last_swap = now
-        last_stats_updated = 0
-        last_log_info = now
+    def update_count(self):
+        self.things_count.append(str(DB_PROC.count))
+        LOOP.call_later(10, self.update_count)
 
-        while True:
+    def swap_oldest(self):
+        if not self.paused and not self.extra_queue.empty():
+            oldest, minutes = self.longest_running()
+            if minutes > conf.MINIMUM_RUNTIME:
+                LOOP.create_task(oldest.lock_and_swap(minutes))
+        LOOP.call_later(conf.SWAP_OLDEST, self.swap_oldest)
+
+    def update_stats(self):
+        self.seen_stats, self.visit_stats, self.delay_stats, self.speed_stats = self.get_visit_stats()
+        self.update_coroutines_count()
+        LOOP.call_later(conf.STAT_REFRESH, self.update_stats)
+
+    def print_status(self):
+        try:
+            system(self.clear)
+            print(self.get_status_message())
+            if self.running:
+                LOOP.call_later(conf.REFRESH_RATE, self.print_status)
+        except CancelledError:
+            return
+        except Exception as e:
+            self.log.exception('{} occurred while printing status.', e.__class__.__name__)
+
+    async def exit_progress(self):
+        while self.coroutines_count > 2:
             try:
-                now = time.monotonic()
-                if now - last_commit > 5:
-                    DB_PROC.commit()
-                    last_commit = now
-                if now - last_swap > conf.SWAP_OLDEST:
-                    if not self.paused and not self.extra_queue.empty():
-                        oldest, minutes = self.longest_running()
-                        if minutes > conf.MINIMUM_RUNTIME:
-                            LOOP.create_task(oldest.lock_and_swap(minutes))
-                    last_swap = now
-                # Record things found count
-                if not self.paused and now - last_stats_updated > conf.STAT_REFRESH:
-                    self.seen_stats, self.visit_stats, self.delay_stats, self.speed_stats = self.get_visit_stats()
-                    self.update_coroutines_count()
-                    last_stats_updated = now
-                if not self.paused and now - last_things_found_updated > 10:
-                    self.things_count = self.things_count[-9:]
-                    self.things_count.append(str(DB_PROC.count))
-                    last_things_found_updated = now
-                if not self.paused and now - last_log_info > 60:
-                    self.log.info(self.get_status_message())
-                    last_log_info = now
-                if self.status_bar:
-                    if platform == 'win32':
-                        system('cls')
-                    else:
-                        system('clear')
-                    print(self.get_status_message())
-
-                if self.paused:
-                    await asyncio.sleep(max(15, conf.REFRESH_RATE), loop=LOOP)
-                else:
-                    await asyncio.sleep(conf.REFRESH_RATE, loop=LOOP)
+                self.update_coroutines_count()
+                pending = DB_PROC.queue.qsize()
+                # Spaces at the end are important, as they clear previously printed
+                # output - \r doesn't clean whole line
+                print(
+                    '{} coroutines active, {} DB items pending   '.format(
+                        self.coroutines_count, pending),
+                    end='\r'
+                )
+                await asyncio.sleep(.5)
             except CancelledError:
                 return
             except Exception as e:
-                self.log.exception('A wild {} appeared in check!', e.__class__.__name__)
+                self.log.exception('A wild {} appeared in exit_progress!', e.__class__.__name__)
 
     @staticmethod
     def generate_stats(somelist):
@@ -193,7 +199,6 @@ class Overseer:
         A = simulating app startup
         T = completing the tutorial
         X = something bad happened
-        H = waiting for the next period on the hashing server
         C = CAPTCHA
 
         Other letters: various errors and procedures
@@ -218,10 +223,14 @@ class Overseer:
 
     def update_coroutines_count(self):
         try:
-            self.coroutines_count = len(asyncio.Task.all_tasks(LOOP))
+            tasks = asyncio.Task.all_tasks(LOOP)
+            if self.running:
+                self.coroutines_count = len(tasks)
+            else:
+                self.coroutines_count = sum(not t.done() for t in tasks)
         except RuntimeError:
             # Set changed size during iteration
-            self.coroutines_count = '?'
+            self.coroutines_count = '-1'
 
     def get_status_message(self):
         running_for = datetime.now() - self.start_date
@@ -285,13 +294,13 @@ class Overseer:
 
         if conf.HASH_KEY:
             try:
-                refresh = HashServer.status.get('period') - time.time()
+                refresh = HashServer.status['period'] - time.time()
                 output.append('Hashes: {r}/{m}, refresh in {t:.0f}'.format(
-                    r=HashServer.status.get('remaining'),
-                    m=HashServer.status.get('maximum'),
+                    r=HashServer.status['remaining'],
+                    m=HashServer.status['maximum'],
                     t=refresh
                 ))
-            except TypeError:
+            except (KeyError, TypeError):
                 pass
 
         try:
@@ -432,7 +441,9 @@ class Overseer:
                             break
                     time_diff = time.time() - spawn_time
 
-                if time_diff > 5 and spawn_id in SIGHTING_CACHE.store:
+                if time_diff < -1:
+                    await asyncio.sleep(time_diff * -1, loop=LOOP)
+                elif time_diff > 5 and spawn_id in SIGHTING_CACHE.store:
                     self.redundant += 1
                     continue
                 elif time_diff > conf.SKIP_SPAWN:
@@ -497,9 +508,6 @@ class Overseer:
                 return
             async with worker.busy:
                 if spawn_time:
-                    time_diff = spawn_time - time.time() + 1
-                    if time_diff > 0:
-                        await asyncio.sleep(time_diff, loop=LOOP)
                     worker.after_spawn = time.time() - spawn_time
 
                 if await worker.visit(point):
@@ -519,7 +527,7 @@ class Overseer:
         else:
             skip_time = time.monotonic() + conf.GIVE_UP_UNKNOWN
 
-        while True:
+        while self.running:
             speed = None
             lowest_speed = float('inf')
             for w in (x for x in self.workers if not x.busy.locked()):

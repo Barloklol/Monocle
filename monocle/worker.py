@@ -3,6 +3,8 @@ from random import choice, randint, uniform, triangular
 from time import time, monotonic
 from queue import Empty
 from itertools import cycle
+from sys import exit
+from concurrent.futures import CancelledError
 
 from aiopogo import PGoApi, exceptions as ex
 from aiopogo.auth_ptc import AuthPtc
@@ -15,13 +17,6 @@ from .shared import get_logger, LOOP, SessionManager, run_threaded, ACCOUNTS
 from .spawns import SPAWNS
 from .db_proc import DB_PROC
 from . import avatar, sanitized as conf
-
-try:
-    import _thread
-except ImportError as e:
-    if conf.FORCED_KILL:
-        raise OSError('Your platform does not support _thread so FORCED_KILL will not work.') from e
-    import _dummy_thread as _thread
 
 if conf.NOTIFY:
     from .notification import Notifier
@@ -44,7 +39,7 @@ elif _unit is Units.meters:
     UNIT_STRING = "m/h"
 _UNIT = _unit.value
 
-VERSIONS = ('0.57.2', '0.57.3', '0.55.0', '0.53.0', '0.53.1', '0.53.2')
+VERSIONS = ('0.57.4', '0.57.3', '0.57.2', '0.55.0')
 
 
 class Worker:
@@ -120,8 +115,6 @@ class Worker:
         self.account_seen = 0
 
         self.api = PGoApi(device_info=device_info)
-        #if conf.HASH_KEY:
-        self.api.activate_hash_server(choice(conf.HASH_KEY))
         self.api.set_position(*self.location, self.altitude)
         if self.proxies:
             self.api.set_proxy(next(self.proxies))
@@ -153,7 +146,7 @@ class Worker:
                     await self.api.set_authentication(
                         username=self.username,
                         password=self.account['password'],
-                        provider=self.account.get('provider', 'ptc'),
+                        provider=self.account.get('provider') or 'ptc',
                         timeout=conf.LOGIN_TIMEOUT
                     )
             except (ex.AuthTimeoutException, ex.AuthConnectionException) as e:
@@ -173,7 +166,7 @@ class Worker:
             raise err
 
         self.error_code = '°'
-        version = 5703
+        version = 5704
         async with self.sim_semaphore:
             self.error_code = 'APP SIMULATION'
             if conf.APP_SIMULATION:
@@ -434,19 +427,8 @@ class Worker:
             if buddy:
                 request.get_buddy_walked()
 
-        try:
-            refresh = HashServer.status.get('period')
-
-            while HashServer.status.get('remaining') < 5 and time() < refresh:
-                self.error_code = 'HASH WAITING'
-                wait = refresh - time() + 1
-                await sleep(wait, loop=LOOP)
-                refresh = HashServer.status.get('period')
-        except TypeError:
-            pass
-
-        now = time()
         if action:
+            now = time()
             # wait for the time required, or at least a half-second
             if self.last_action > now + .5:
                 await sleep(self.last_action - now, loop=LOOP)
@@ -565,7 +547,7 @@ class Worker:
                         err = 'A new version is being forced, exiting.'
                         self.log.error(err)
                         print(err)
-                        _thread.interrupt_main()
+                        exit()
                 except KeyError:
                     pass
         if self.check_captcha(responses):
@@ -664,7 +646,7 @@ class Worker:
             err = 'Hash key has expired: {}'.format(conf.HASH_KEY)
             self.log.error(err)
             print(err)
-            _thread.interrupt_main()
+            exit()
         except (ex.MalformedResponseException, ex.UnexpectedResponseException) as e:
             self.log.warning('{} Giving up.', e)
             self.error_code = 'MALFORMED RESPONSE'
@@ -677,6 +659,8 @@ class Worker:
         except ex.AiopogoError as e:
             self.log.exception(e.__class__.__name__)
             self.error_code = 'AIOPOGO ERROR'
+        except CancelledError:
+            self.log.warning('Visit cancelled.')
         except Exception as e:
             self.log.exception('A wild {} appeared!', e.__class__.__name__)
             self.error_code = 'EXCEPTION'
@@ -757,6 +741,9 @@ class Worker:
                     if conf.ENCOUNTER:
                         try:
                             await self.encounter(normalized)
+                        except CancelledError:
+                            DB_PROC.add(normalized)
+                            raise
                         except Exception as e:
                             self.log.warning('{} during encounter', e.__class__.__name__)
                     LOOP.create_task(self.notifier.notify(normalized, time_of_day))
@@ -1069,6 +1056,8 @@ class Worker:
             }
             async with session.post('http://2captcha.com/in.php', params=params, timeout=10) as resp:
                 response = await resp.json()
+        except CancelledError:
+            raise
         except Exception as e:
             self.log.error('Got an error while trying to solve CAPTCHA. '
                            'Check your API Key and account balance.')
@@ -1097,6 +1086,8 @@ class Worker:
                 if response.get('request') != 'CAPCHA_NOT_READY':
                     break
                 await sleep(5, loop=LOOP)
+        except CancelledError:
+            raise
         except Exception as e:
             self.log.error('Got an error while trying to solve CAPTCHA. '
                               'Check your API Key and account balance.')
@@ -1115,7 +1106,7 @@ class Worker:
             self.log.warning("Successfully solved CAPTCHA")
         except CaptchaException:
             self.log.warning("CAPTCHA #{} for {} was not solved correctly, trying again",
-                captcha_id, self.username)
+                code, self.username)
             # try again
             await self.handle_captcha(responses)
 

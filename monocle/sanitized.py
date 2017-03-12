@@ -18,6 +18,7 @@ set_sequence_range = (tuple, list, range, set, frozenset)
 worker_count = config.GRID[0] * config.GRID[1]
 
 _valid_types = {
+    'QUIXNENC': sequence,
     'ACCOUNTS': set_sequence,
     'ACCOUNTS_CSV': path,
     'ALT_RANGE': sequence,
@@ -49,7 +50,7 @@ _valid_types = {
     'GOOGLE_MAPS_KEY': str,
     'GRID': sequence,
     'HASHTAGS': set_sequence,
-    'HASH_KEY': str,
+    'HASH_KEY': sequence,
     'HEATMAP': bool,
     'IGNORE_IVS': bool,
     'IGNORE_RARITY': bool,

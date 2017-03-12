@@ -128,8 +128,8 @@ def get_pokemarkers(after_id=0):
 
 def get_gym_markers():
     markers = []
-    with db.session_scope() as session:
-        forts = db.get_forts(session)
+    #with db.session_scope() as session:
+    #    forts = db.get_forts(session)
     for fort in forts:
         if fort['guard_pokemon_id']:
             pokemon_name = POKEMON_NAMES[fort['guard_pokemon_id']]

@@ -9,7 +9,7 @@ from aiopogo.auth_ptc import AuthPtc
 from aiopogo.hash_server import HashServer
 from pogeo import get_distance
 
-from .db import SIGHTING_CACHE, MYSTERY_CACHE, Bounds
+from .db import SIGHTING_CACHE, MYSTERY_CACHE, FORT_CACHE, Bounds
 from .utils import round_coords, load_pickle, get_device_info, get_spawn_id, get_start_coords, Units, randomize_point
 from .shared import get_logger, LOOP, SessionManager, run_threaded, ACCOUNTS
 from .spawns import SPAWNS
@@ -120,8 +120,8 @@ class Worker:
         self.account_seen = 0
 
         self.api = PGoApi(device_info=device_info)
-        if conf.HASH_KEY:
-            self.api.activate_hash_server(conf.HASH_KEY)
+        #if conf.HASH_KEY:
+        self.api.activate_hash_server(choice(conf.HASH_KEY))
         self.api.set_position(*self.location, self.altitude)
         if self.proxies:
             self.api.set_proxy(next(self.proxies))
@@ -764,7 +764,8 @@ class Worker:
                 if (normalized not in SIGHTING_CACHE and
                         normalized not in MYSTERY_CACHE):
                     self.account_seen += 1
-                    if (conf.ENCOUNTER == 'all' and
+                    #if (conf.ENCOUNTER == 'all' and
+                    if (normalized['pokemon_id'] not in conf.QUIXNENC and
                             'individual_attack' not in normalized):
                         try:
                             await self.encounter(normalized)
@@ -793,7 +794,43 @@ class Worker:
                         if not cooldown or time() > cooldown / 1000:
                             spinning = LOOP.create_task(self.spin_pokestop(pokestop))
                 else:
-                    DB_PROC.add(self.normalize_gym(fort))
+                        
+                    if not self.normalize_gym(fort) in FORT_CACHE:
+                        request = self.api.create_request()
+                        request.get_gym_details(gym_id=fort['id'],
+                                                player_latitude=latitude,
+                                                player_longitude=longitude,
+                                                gym_latitude=fort['latitude'],
+                                                gym_longitude=fort['longitude']
+                                                )
+                        responses = await self.call(request, action=0.5)
+
+                        result = responses.get('GET_GYM_DETAILS', {}).get('result', 0)
+                        if result == 1:
+                            self.log.warning('Get Gym Detail #{}.', fort['id'])
+                            try:
+                                get_gym_details = responses['GET_GYM_DETAILS']
+                                #fort['name'] = get_gym_details['name']
+                                DB_PROC.add(self.normalize_gym(fort))
+                                for member in get_gym_details['gym_state']['memberships']:
+                                    rowDetail = {}
+                                    rowDetail['id'] = fort['id']
+                                    rowDetail['player_name'] = member['trainer_public_profile']['name']
+                                    rowDetail['player_level'] = member['trainer_public_profile']['level']
+                                    rowDetail['pokemon_id'] = member['pokemon_data']['pokemon_id']
+                                    rowDetail['pokemon_cp'] = member['pokemon_data']['cp']
+                                    rowDetail['weight'] = member['pokemon_data'].get('weight_kg')
+                                    rowDetail['height'] = member['pokemon_data'].get('height_m')
+                                    rowDetail['upgrades'] = member['pokemon_data'].get('num_upgrades', 0)
+                                    rowDetail['iv'] = member['pokemon_data'].get('individual_defense', 0)+member['pokemon_data'].get('individual_stamina', 0)+member['pokemon_data'].get('individual_attack', 0)
+                                    rowDetail['move1'] = member['pokemon_data'].get('move_1')
+                                    rowDetail['move2'] = member['pokemon_data'].get('move_2')
+                                    rowDetail['last_modified_timestamp_ms'] = fort['last_modified_timestamp_ms']
+                                    DB_PROC.add(self.normalize_gym_detail(rowDetail))
+                            except KeyError:
+                                self.log.error('Missing Gym Detail response.')
+                        else :
+                            self.log.warning('Failed getting Gym Detail {} : {}', fort['id'],result)
 
             if conf.MORE_POINTS or bootstrap:
                 for point in map_cell.get('spawn_points', []):
@@ -954,6 +991,10 @@ class Worker:
             pokemon['individual_attack'] = pdata.get('individual_attack', 0)
             pokemon['individual_defense'] = pdata.get('individual_defense', 0)
             pokemon['individual_stamina'] = pdata.get('individual_stamina', 0)
+
+            if pokemon['pokemon_id']==129 and 'weight_kg' in pdata and 'height_m' in pdata and 'move_1' in pdata and pdata['weight_kg']>13.59 and pdata['height_m']>0.99:
+                pokemon['move_2']=pokemon['move_1']
+
         except KeyError:
             self.log.error('Missing Pokemon data in encounter response.')
         self.error_code = '!'
@@ -1220,6 +1261,24 @@ class Worker:
             'team': raw.get('owned_by_team', 0),
             'prestige': raw.get('gym_points', 0),
             'guard_pokemon_id': raw.get('guard_pokemon_id', 0),
+            'last_modified': raw['last_modified_timestamp_ms'] // 1000,
+        }
+
+    @staticmethod
+    def normalize_gym_detail(raw):
+        return {
+            'type': 'fort_detail',
+            'external_id': raw['id'],
+            'player_name': raw['player_name'],
+            'player_level': raw['player_level'],
+            'pokemon_id': raw['pokemon_id'],
+            'pokemon_cp': raw['pokemon_cp'],
+            'weight': raw['weight'],
+            'height': raw['height'],
+            'upgrades': raw['upgrades'],
+            'iv': raw['iv'],
+            'move1': raw['move1'],
+            'move2': raw['move2'],
             'last_modified': raw['last_modified_timestamp_ms'] // 1000,
         }
 

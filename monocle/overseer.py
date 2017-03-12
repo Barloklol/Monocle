@@ -19,7 +19,7 @@ try:
 except ImportError:
     import _dummy_thread as _thread
 
-from .db import SIGHTING_CACHE, MYSTERY_CACHE
+from .db import SIGHTING_CACHE, MYSTERY_CACHE, FORT_DETAIL_CACHE
 from .utils import get_current_hour, dump_pickle, get_start_coords, get_bootstrap_points, randomize_point
 from .shared import get_logger, LOOP, run_threaded, ACCOUNTS
 from .db_proc import DB_PROC
@@ -98,6 +98,7 @@ class Overseer:
         last_things_found_updated = now
         last_swap = now
         last_stats_updated = 0
+        last_log_info = now
 
         while True:
             try:
@@ -120,6 +121,9 @@ class Overseer:
                     self.things_count = self.things_count[-9:]
                     self.things_count.append(str(DB_PROC.count))
                     last_things_found_updated = now
+                if not self.paused and now - last_log_info > 60:
+                    self.log.info(self.get_status_message())
+                    last_log_info = now
                 if self.status_bar:
                     if platform == 'win32':
                         system('cls')

@@ -751,8 +751,7 @@ class Worker:
                 if (normalized not in SIGHTING_CACHE and
                         normalized not in MYSTERY_CACHE):
                     self.account_seen += 1
-                    #if (conf.ENCOUNTER == 'all' and
-                    if (normalized['pokemon_id'] not in conf.QUIXNENC and
+                    if (conf.ENCOUNTER == 'all' and
                             'individual_attack' not in normalized):
                         try:
                             await self.encounter(normalized)

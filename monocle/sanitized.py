@@ -18,7 +18,6 @@ set_sequence_range = (tuple, list, range, set, frozenset)
 worker_count = config.GRID[0] * config.GRID[1]
 
 _valid_types = {
-    'QUIXNENC': sequence,
     'ACCOUNTS': set_sequence,
     'ACCOUNTS_CSV': path,
     'ALT_RANGE': sequence,

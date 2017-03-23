@@ -796,6 +796,10 @@ class Notifier:
             data['message']['individual_stamina'] = pokemon['individual_stamina']
             data['message']['move_1'] = pokemon['move_1']
             data['message']['move_2'] = pokemon['move_2']
+            data['message']['verified'] = 1
+            data['message']['seconds_until_despawn'] = ts
+            data['message']['spawn_start'] = 0
+            data['message']['spawn_end'] = 0
         except KeyError:
             pass
 

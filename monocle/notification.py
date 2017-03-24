@@ -766,7 +766,7 @@ class Notifier:
         else:
             return self.cleanup(encounter_id, cache_handle)
 
-    async def webhook(self, pokemon):
+    async def webhook(self, pokemon, time):
         """ Send a notification via webhook
         """
         try:

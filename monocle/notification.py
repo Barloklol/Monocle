@@ -797,7 +797,7 @@ class Notifier:
             data['message']['move_1'] = pokemon['move_1']
             data['message']['move_2'] = pokemon['move_2']
             data['message']['verified'] = 1
-            data['message']['seconds_until_despawn'] = ts
+            data['message']['seconds_until_despawn'] = ts - time.time() * 1000
             data['message']['spawn_start'] = 0
             data['message']['spawn_end'] = 0
         except KeyError:

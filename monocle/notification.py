@@ -766,7 +766,7 @@ class Notifier:
         else:
             return self.cleanup(encounter_id, cache_handle)
 
-    async def webhook(self, pokemon, time):
+    async def webhook(self, pokemon):
         """ Send a notification via webhook
         """
         try:
@@ -797,7 +797,7 @@ class Notifier:
             data['message']['move_1'] = pokemon['move_1']
             data['message']['move_2'] = pokemon['move_2']
             data['message']['verified'] = 1
-            data['message']['seconds_until_despawn'] = ts - time.time() * 1000
+            data['message']['seconds_until_despawn'] = ts - time() * 1000
             data['message']['spawn_start'] = 0
             data['message']['spawn_end'] = 0
         except KeyError:

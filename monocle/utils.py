@@ -116,7 +116,7 @@ def get_altitude(point):
     #r = requests.get('https://maps.googleapis.com/maps/api/elevation/json',
     #                 params=params).json()
 
-    params = {'locs': polyline.encode((point,))}
+    params = {'locations': 'enc:' + polyencode((point,))}
     r = requests.get('http://alt.festzeit.ch/',
                      params=params).json()
     return r['results'][0]['elevation']
@@ -141,7 +141,7 @@ def get_altitudes(coords):
             #r = requests.get('https://maps.googleapis.com/maps/api/elevation/json',
             #                 params=params).json()
 
-            params = {'locs': polyencode(coords)}
+            params = {'locations': 'enc:' + polyencode(coords)}
             r = requests.get('http://alt.festzeit.ch/',
                              params=params).json()
 

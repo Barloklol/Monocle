@@ -109,18 +109,18 @@ def random_altitude():
 
 
 def get_altitude(point):
-    #params = {
-	#'locations': 'enc:' + polyencode((point,))}
-    #    'key': conf.GOOGLE_MAPS_KEY
-    #}
+    #params = {'locations': 'enc:' + polyline.encode((point,))}
+    #if conf.GOOGLE_MAPS_KEY:
+    #    params['key'] = conf.GOOGLE_MAPS_KEY
     #r = requests.get('https://maps.googleapis.com/maps/api/elevation/json',
     #                 params=params).json()
 
-    params = {'locs': polyline.encode((point,))}
-    print (params)
+    params = {'locs': polyencode((point,))}
     r = requests.get('http://alt.festzeit.ch/',
                      params=params).json()
-    return r['results'][0]['elevation']
+
+    altitude = r['results'][0]['elevation']
+    return altitude
 
 
 def get_altitudes(coords):
@@ -136,13 +136,13 @@ def get_altitudes(coords):
         return altitudes
     else:
         try:
-            #params = {'locations': 'enc:' + polyencode(coords)}
+            #params = {'locations': 'enc:' + polyline.encode(coords)}
             #if conf.GOOGLE_MAPS_KEY:
             #    params['key'] = conf.GOOGLE_MAPS_KEY
             #r = requests.get('https://maps.googleapis.com/maps/api/elevation/json',
             #                 params=params).json()
 
-            params = {'locs': polyline.encode(coords)}
+            params = {'locs': polyencode(coords)}
             r = requests.get('http://alt.festzeit.ch/',
                              params=params).json()
 

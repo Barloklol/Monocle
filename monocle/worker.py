@@ -473,24 +473,24 @@ class Worker:
                 await self.login(reauth=True)
             except ex.TimeoutException as e:
                 self.error_code = 'TIMEOUT'
-                if err != e:
+                if not isinstance(e, type(err)):
                     err = e
                     self.log.warning('{}', e)
                 await sleep(10, loop=LOOP)
             except ex.HashingOfflineException as e:
-                if err != e:
+                if not isinstance(e, type(err)):
                     err = e
                     self.log.warning('{}', e)
                 self.error_code = 'HASHING OFFLINE'
                 await sleep(5, loop=LOOP)
             except ex.NianticOfflineException as e:
-                if err != e:
+                if not isinstance(e, type(err)):
                     err = e
                     self.log.warning('{}', e)
                 self.error_code = 'NIANTIC OFFLINE'
                 await self.random_sleep()
             except ex.HashingQuotaExceededException as e:
-                if err != e:
+                if not isinstance(e, type(err)):
                     err = e
                     self.log.warning('Exceeded your hashing quota, sleeping.')
                 self.error_code = 'QUOTA EXCEEDED'
@@ -507,13 +507,13 @@ class Worker:
                 raise
             except ex.InvalidRPCException as e:
                 self.last_request = time()
-                if err != e:
+                if not isinstance(e, type(err)):
                     err = e
                     self.log.warning('{}', e)
                 self.error_code = 'INVALID REQUEST'
                 await self.random_sleep()
             except ex.ProxyException as e:
-                if err != e:
+                if not isinstance(e, type(err)):
                     err = e
                 self.error_code = 'PROXY ERROR'
 
@@ -521,12 +521,12 @@ class Worker:
                     self.log.error('{}, swapping proxy.', e)
                     self.swap_proxy()
                 else:
-                    if err != e:
+                    if not isinstance(e, type(err)):
                         self.log.error('{}', e)
                     await sleep(5, loop=LOOP)
             except (ex.MalformedResponseException, ex.UnexpectedResponseException) as e:
                 self.last_request = time()
-                if err != e:
+                if not isinstance(e, type(err)):
                     self.log.warning('{}', e)
                 self.error_code = 'MALFORMED RESPONSE'
                 await self.random_sleep()
@@ -645,6 +645,9 @@ class Worker:
                 self.swap_proxy()
             else:
                 self.log.error('IP banned.')
+        except ex.NianticOfflineException as e:
+            await self.swap_account(reason='Niantic endpoint failure')
+            self.log.warning('{}. Giving up.', e)
         except ex.ServerBusyOrOfflineException as e:
             self.log.warning('{} Giving up.', e)
         except ex.BadRPCException:
@@ -653,9 +656,9 @@ class Worker:
             await self.new_account()
         except ex.InvalidRPCException as e:
             self.log.warning('{} Giving up.', e)
-        except ex.ExpiredHashKeyException:
+        except ex.ExpiredHashKeyException as e:
             self.error_code = 'KEY EXPIRED'
-            err = 'Hash key has expired: {}'.format(conf.HASH_KEY)
+            err = str(e)
             self.log.error(err)
             print(err)
             exit()
@@ -739,7 +742,7 @@ class Worker:
                 if conf.NOTIFY and self.notifier.eligible(normalized):
                     if conf.ENCOUNTER:
                         try:
-                            await self.encounter(normalized)
+                            await self.encounter(normalized, pokemon['spawn_point_id'])
                         except CancelledError:
                             DB_PROC.add(normalized)
                             raise
@@ -753,7 +756,7 @@ class Worker:
                     if (conf.ENCOUNTER == 'all' and
                             'individual_attack' not in normalized):
                         try:
-                            await self.encounter(normalized)
+                            await self.encounter(normalized, pokemon['spawn_point_id'])
                         except Exception as e:
                             self.log.warning('{} during encounter', e.__class__.__name__)
                 DB_PROC.add(normalized)
@@ -930,7 +933,7 @@ class Worker:
         self.error_code = '!'
         return responses
 
-    async def encounter(self, pokemon):
+    async def encounter(self, pokemon, spawn_id):
         distance_to_pokemon = get_distance(self.location, (pokemon['lat'], pokemon['lon']))
 
         self.error_code = '~'
@@ -941,24 +944,15 @@ class Worker:
             lon_change = (self.location[1] - pokemon['lon']) * percent
             self.location = (
                 self.location[0] - lat_change,
-                self.location[1] - lon_change,
-            )
+                self.location[1] - lon_change)
             self.altitude = uniform(self.altitude - 2, self.altitude + 2)
             self.api.set_position(*self.location, self.altitude)
-            delay_required = (distance_to_pokemon * percent) / 8
-            if delay_required < 1.5:
-                delay_required = triangular(1.5, 4, 2.25)
+            delay_required = min((distance_to_pokemon * percent) / 8, 1.1)
         else:
             self.simulate_jitter()
-            delay_required = triangular(1.5, 4, 2.25)
+            delay_required = 1.1
 
-        if time() - self.last_request < delay_required:
-            await sleep(delay_required, loop=LOOP)
-
-        try:
-            spawn_id = hex(pokemon['spawn_id'])[2:]
-        except TypeError:
-            spawn_id = pokemon['spawn_id']
+        await self.random_sleep(delay_required, delay_required + 1.5)
 
         request = self.api.create_request()
         request = request.encounter(encounter_id=pokemon['encounter_id'],
@@ -1293,9 +1287,9 @@ class Worker:
             return False
 
     @staticmethod
-    async def random_sleep(minimum=10.1, maximum=14):
+    async def random_sleep(minimum=10.1, maximum=14, loop=LOOP):
         """Sleeps for a bit"""
-        await sleep(uniform(minimum, maximum), loop=LOOP)
+        await sleep(uniform(minimum, maximum), loop=loop)
 
     @property
     def start_time(self):

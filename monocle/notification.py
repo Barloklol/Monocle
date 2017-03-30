@@ -796,6 +796,10 @@ class Notifier:
             data['message']['height'] = pokemon['height']
             data['message']['weight'] = pokemon['weight']
             data['message']['gender'] = pokemon['gender']
+            data['message']['verified'] = 1
+            data['message']['seconds_until_despawn'] = ts - time() 
+            data['message']['spawn_start'] = 0
+            data['message']['spawn_end'] = 0
         except KeyError:
             pass
 

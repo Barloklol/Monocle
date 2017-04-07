@@ -415,7 +415,8 @@ class Overseer:
         skip_spawn = conf.SKIP_SPAWN
         for point, (spawn_id, spawn_seconds) in spawns_iter:
             try:
-                if self.captchas > captcha_limit:
+                captchas = Worker.g['captchas']
+                if captchas > captcha_limit:
                     self.paused = True
             except (EOFError, BrokenPipeError, FileNotFoundError):
                 pass

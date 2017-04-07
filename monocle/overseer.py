@@ -417,7 +417,7 @@ class Overseer:
             try:
                 captchas = Worker.g['captchas']
                 if captchas > captcha_limit:
-                    self.paused = True
+                    sys.exit()
                     #self.idle_seconds += await run_threaded(self.captcha_queue.full_wait, conf.MAX_CAPTCHAS)
                     #self.paused = False
             except (EOFError, BrokenPipeError, FileNotFoundError):

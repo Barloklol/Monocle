@@ -13,7 +13,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from . import utils, bounds, spawns, db_proc, sanitized as conf
 from .utils import time_until_time, dump_pickle, load_pickle
-from .shared import call_at
+from .shared import call_at, get_logger
 
 try:
     assert conf.LAST_MIGRATION < time()

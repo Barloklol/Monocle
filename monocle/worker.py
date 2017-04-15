@@ -840,7 +840,7 @@ class Worker:
                     pass
 
         if spawn_id:
-            DB_PROC.add({
+            db_proc.add({
                 'type': 'target',
                 'seen': seen_target,
                 'spawn_id': spawn_id})

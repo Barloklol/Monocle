@@ -13,14 +13,14 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from . import utils, bounds, spawns, db_proc, sanitized as conf
 from .utils import time_until_time, dump_pickle, load_pickle
-from .shared import call_at, get_logger
+from .shared import call_at
 
 try:
     assert conf.LAST_MIGRATION < time()
 except AssertionError:
     raise ValueError('LAST_MIGRATION must be a timestamp from the past.')
-
-log = get_logger(__name__)
+except TypeError as e:
+    raise TypeError('LAST_MIGRATION must be a numeric timestamp.') from e
 
 if conf.DB_ENGINE.startswith('mysql'):
     TINY_TYPE = TINYINT(unsigned=True)          # 0 to 255

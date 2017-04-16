@@ -647,7 +647,6 @@ class Worker:
                 self.swap_proxy()
             else:
                 self.log.error('IP banned.')
-            self.log.error('IP banned.')
         except ex.NianticOfflineException as e:
             await self.swap_account(reason='Niantic endpoint failure')
             self.log.warning('{}. Giving up.', e)

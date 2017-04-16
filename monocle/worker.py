@@ -804,7 +804,7 @@ class Worker:
 
                         result = responses.get('GET_GYM_DETAILS', {}).get('result', 0)
                         if result == 1:
-                            self.log.warning('Get Gym Detail #{}.', fort['id'])
+                            self.log.info('Get Gym Detail #{}.', fort['id'])
                             try:
                                 get_gym_details = responses['GET_GYM_DETAILS']
                                 #fort['name'] = get_gym_details['name']

@@ -642,12 +642,13 @@ class Worker:
             self.log.warning('{} Giving up.', e)
         except ex.NianticIPBannedException:
             self.error_code = 'IP BANNED'
-
+          
             #if self.multiproxy:
                 #self.log.warning('Swapping out {} due to IP ban.', self.api.proxy)
                 #self.swap_proxy()
             #else:
                 #self.log.error('IP banned.')
+            self.log.error('IP banned.')
         except ex.NianticOfflineException as e:
             await self.swap_account(reason='Niantic endpoint failure')
             self.log.warning('{}. Giving up.', e)

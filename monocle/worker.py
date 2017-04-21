@@ -6,15 +6,14 @@ from itertools import cycle
 from sys import exit
 from distutils.version import StrictVersion
 
-from aiopogo import PGoApi, json_loads, exceptions as ex
+from aiopogo import PGoApi, HashServer, json_loads, exceptions as ex
 from aiopogo.auth_ptc import AuthPtc
-from aiopogo.hash_server import HashServer
 from pogeo import get_distance
 
 from .db import SIGHTING_CACHE, MYSTERY_CACHE, FORT_CACHE
 from .utils import round_coords, load_pickle, get_device_info, get_spawn_id, get_start_coords, Units, randomize_point
 from .shared import get_logger, LOOP, SessionManager, run_threaded, ACCOUNTS
-from . import avatar, bounds, db_proc, spawns, sanitized as conf
+from . import altitudes, avatar, bounds, db_proc, spawns, sanitized as conf
 
 if conf.NOTIFY:
     from .notification import Notifier
@@ -595,7 +594,10 @@ class Worker:
         Also is capable of restarting in case an error occurs.
         """
         try:
-            self.altitude = spawns.get_altitude(point, randomize=5)
+            try:
+                self.altitude = altitudes.get(point)
+            except KeyError:
+                self.altitude = await altitudes.fetch(point)
             self.location = point
             self.api.set_position(*self.location, self.altitude)
             if not self.authenticated:
@@ -606,7 +608,7 @@ class Worker:
             await sleep(1, loop=LOOP)
             if not await self.login(reauth=True):
                 await self.swap_account(reason='reauth failed')
-            return await self.visit(point, bootstrap)
+            return await self.visit(point, spawn_id, bootstrap)
         except ex.AuthException as e:
             self.log.warning('Auth error on {}: {}', self.username, e)
             self.error_code = 'NOT AUTHENTICATED'
@@ -1053,7 +1055,7 @@ class Worker:
                 'pageurl': responses.get('CHECK_CHALLENGE', {}).get('challenge_url'),
                 'json': 1
             }
-            async with session.post('http://2captcha.com/in.php', params=params, timeout=10) as resp:
+            async with session.post('http://2captcha.com/in.php', params=params) as resp:
                 response = await resp.json(loads=json_loads)
         except CancelledError:
             raise

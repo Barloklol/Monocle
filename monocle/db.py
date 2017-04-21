@@ -13,14 +13,14 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from . import utils, bounds, spawns, db_proc, sanitized as conf
 from .utils import time_until_time, dump_pickle, load_pickle
-from .shared import call_at
+from .shared import call_at, get_logger
 
 try:
     assert conf.LAST_MIGRATION < time()
 except AssertionError:
     raise ValueError('LAST_MIGRATION must be a timestamp from the past.')
-except TypeError as e:
-    raise TypeError('LAST_MIGRATION must be a numeric timestamp.') from e
+
+log = get_logger(__name__)
 
 if conf.DB_ENGINE.startswith('mysql'):
     TINY_TYPE = TINYINT(unsigned=True)          # 0 to 255
@@ -293,7 +293,6 @@ class Spawnpoint(Base):
     despawn_time = Column(SmallInteger, index=True)
     lat = Column(FLOAT_TYPE)
     lon = Column(FLOAT_TYPE)
-    alt = Column(SmallInteger)
     updated = Column(Integer, index=True)
     duration = Column(TINY_TYPE)
     failures = Column(TINY_TYPE)
@@ -443,7 +442,6 @@ def add_spawnpoint(session, pokemon):
 
         existing.despawn_time = new_time
     else:
-        altitude = spawns.get_altitude(point)
         widest = get_widest_range(session, spawn_id)
 
         duration = 60 if widest and widest > 1800 else None
@@ -453,7 +451,6 @@ def add_spawnpoint(session, pokemon):
             despawn_time=new_time,
             lat=pokemon['lat'],
             lon=pokemon['lon'],
-            alt=altitude,
             updated=now,
             duration=duration,
             failures=0
@@ -467,14 +464,12 @@ def add_mystery_spawnpoint(session, pokemon):
     if point in spawns.unknown or session.query(exists().where(
             Spawnpoint.spawn_id == spawn_id)).scalar():
         return
-    altitude = spawns.get_altitude(point)
 
     session.add(Spawnpoint(
         spawn_id=spawn_id,
         despawn_time=None,
         lat=pokemon['lat'],
         lon=pokemon['lon'],
-        alt=altitude,
         updated=0,
         duration=None,
         failures=0
@@ -748,7 +743,7 @@ def get_punch_card(session):
         .order_by('ts_date')
     if conf.REPORT_SINCE:
         query = query.filter(Sighting.expire_timestamp > SINCE_TIME)
-    results = query.fetchall()
+    results = query.all()
     results_dict = {r[0]: r[1] for r in results}
     filled = []
     for row_no, i in enumerate(range(int(results[0][0]), int(results[-1][0]))):

@@ -44,13 +44,13 @@ class Altitudes:
     async def fetch_alts(self, coords, session, precision=conf.ALT_PRECISION):
         try:
             async with session.get(
-                    'https://maps.googleapis.com/maps/api/elevation/json',
-                    params={'locations': 'enc:' + polyencode(coords),
-                            'key': conf.GOOGLE_MAPS_KEY},
-                    #'http://alt.festzeit.ch/',
-                    #params = {'locs': polyencode(coords)},
+                    #'https://maps.googleapis.com/maps/api/elevation/json',
+                    #params={'locations': 'enc:' + polyencode(coords),
+                    #        'key': conf.GOOGLE_MAPS_KEY},
+                    'http://alt.festzeit.ch/',
+                    params = {'locs': polyencode(coords)},
                     timeout=10) as resp:
-                response = await resp.json(loads=json_loads)
+                response = await resp.json(content_type='text/html')
             for r in response['results']:
                 coords = round_coords((r['location']['lat'], r['location']['lng']), precision)
                 self.altitudes[coords] = r['elevation']
@@ -65,18 +65,18 @@ class Altitudes:
         return randomize(alt - 2.5, alt + 2.5)
 
     async def fetch(self, point, key=conf.GOOGLE_MAPS_KEY):
-        if not key:
-            return self.fallback()
+        #if not key:
+        #    return self.fallback()
         try:
             async with ClientSession(loop=LOOP) as session:
                 async with session.get(
-                        'https://maps.googleapis.com/maps/api/elevation/json',
-                        params={'locations': '{0[0]},{0[1]}'.format(point),
-                                'key': key},
-                        #'http://alt.festzeit.ch/',
-                        #params = {'locs': '{0[0]},{0[1]}'.format(point)},
+                        #'https://maps.googleapis.com/maps/api/elevation/json',
+                        #params={'locations': '{0[0]},{0[1]}'.format(point),
+                        #        'key': key},
+                        'http://alt.festzeit.ch/',
+                        params = {'locs': polyencode((point,))},
                         timeout=10) as resp:
-                    response = await resp.json(loads=json_loads)
+                    response = await resp.json(content_type='text/html')
                     altitude = response['results'][0]['elevation']
                     self.altitudes[point] = altitude
                     self.changed = True

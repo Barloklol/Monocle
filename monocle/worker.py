@@ -813,7 +813,7 @@ class Worker:
                                 for member in get_gym_details['gym_state']['memberships']:
                                     rowDetail = {}
                                     rowDetail['id'] = fort['id']
-                                    rowDetail['name'] = member['name']
+                                    rowDetail['name'] = get_gym_details['name']
                                     rowDetail['player_name'] = member['trainer_public_profile']['name']
                                     rowDetail['player_level'] = member['trainer_public_profile']['level']
                                     rowDetail['pokemon_id'] = member['pokemon_data']['pokemon_id']

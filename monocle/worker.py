@@ -792,7 +792,7 @@ class Worker:
                         if not cooldown or time() > cooldown / 1000:
                             await self.spin_pokestop(pokestop)
                 else:
-                        
+                    fort['name'] = ""
                     if not self.normalize_gym(fort) in FORT_CACHE:
                         request = self.api.create_request()
                         request.get_gym_details(gym_id=fort['id'],

@@ -1246,6 +1246,7 @@ class Worker:
         return {
             'type': 'fort',
             'external_id': raw['id'],
+            'name': raw['name'],
             'lat': raw['latitude'],
             'lon': raw['longitude'],
             'team': raw.get('owned_by_team', 0),

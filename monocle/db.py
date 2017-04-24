@@ -323,6 +323,7 @@ class FortDetail(Base):
 
     id = Column(Integer, primary_key=True)
     fort_id = Column(Integer, ForeignKey('forts.id'))
+    name = Column(String(100), index=True)
     player_name = Column(String(100), index=True)
     player_level = Column(Integer)
     pokemon_id = Column(Integer)
@@ -565,6 +566,7 @@ def add_fort_detail_sighting(session, raw_fort_detail):
 
     obj = FortDetail(
         fort=fort,
+        name=raw_fort_detail['name'],
         player_name=raw_fort_detail['player_name'],
         player_level=raw_fort_detail['player_level'],
         pokemon_id=raw_fort_detail['pokemon_id'],

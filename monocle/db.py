@@ -323,7 +323,6 @@ class FortDetail(Base):
 
     id = Column(Integer, primary_key=True)
     fort_id = Column(Integer, ForeignKey('forts.id'))
-    name = Column(String(100), index=True)
     player_name = Column(String(100), index=True)
     player_level = Column(Integer)
     pokemon_id = Column(Integer)
@@ -350,6 +349,7 @@ class FortSighting(Base):
 
     id = Column(Integer, primary_key=True)
     fort_id = Column(Integer, ForeignKey('forts.id'))
+    name = Column(String(100), index=True)
     last_modified = Column(Integer, index=True)
     team = Column(TINY_TYPE)
     prestige = Column(MEDIUM_TYPE)
@@ -536,6 +536,7 @@ def add_fort_sighting(session, raw_fort):
         return
     obj = FortSighting(
         fort=fort,
+        name=raw_fort['name'],
         team=raw_fort['team'],
         prestige=raw_fort['prestige'],
         guard_pokemon_id=raw_fort['guard_pokemon_id'],
@@ -566,7 +567,6 @@ def add_fort_detail_sighting(session, raw_fort_detail):
 
     obj = FortDetail(
         fort=fort,
-        name=raw_fort_detail['name'],
         player_name=raw_fort_detail['player_name'],
         player_level=raw_fort_detail['player_level'],
         pokemon_id=raw_fort_detail['pokemon_id'],

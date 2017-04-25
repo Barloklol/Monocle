@@ -792,7 +792,7 @@ class Worker:
                         if not cooldown or time() > cooldown / 1000:
                             await self.spin_pokestop(pokestop)
                 else:
-                        
+                    fort['name'] = ""    
                     if not self.normalize_gym(fort) in FORT_CACHE:
                         request = self.api.create_request()
                         request.get_gym_details(gym_id=fort['id'],
@@ -808,12 +808,11 @@ class Worker:
                             self.log.info('Get Gym Detail #{}.', fort['id'])
                             try:
                                 get_gym_details = responses['GET_GYM_DETAILS']
-                                #fort['name'] = get_gym_details['name']
+                                fort['name'] = get_gym_details['name']
                                 db_proc.add(self.normalize_gym(fort))
                                 for member in get_gym_details['gym_state']['memberships']:
                                     rowDetail = {}
                                     rowDetail['id'] = fort['id']
-                                    rowDetail['name'] = get_gym_details['name']
                                     rowDetail['player_name'] = member['trainer_public_profile']['name']
                                     rowDetail['player_level'] = member['trainer_public_profile']['level']
                                     rowDetail['pokemon_id'] = member['pokemon_data']['pokemon_id']
@@ -1247,6 +1246,7 @@ class Worker:
         return {
             'type': 'fort',
             'external_id': raw['id'],
+            'name': raw['name'],
             'lat': raw['latitude'],
             'lon': raw['longitude'],
             'team': raw.get('owned_by_team', 0),
@@ -1260,7 +1260,6 @@ class Worker:
         return {
             'type': 'fort_detail',
             'external_id': raw['id'],
-            'name': raw['name'],
             'player_name': raw['player_name'],
             'player_level': raw['player_level'],
             'pokemon_id': raw['pokemon_id'],

@@ -179,7 +179,7 @@ class Worker:
             raise err
 
         self.error_code = '°'
-        version = 6301
+        version = 6304
         async with self.sim_semaphore:
             self.error_code = 'APP SIMULATION'
             if conf.APP_SIMULATION:
@@ -605,7 +605,7 @@ class Worker:
                             and conf.FORCED_KILL
                             and dl_settings['settings']['minimum_client_version'] != '0.63.1'):
                         forced_version = StrictVersion(dl_settings['settings']['minimum_client_version'])
-                        if forced_version > StrictVersion('0.63.1'):
+                        if forced_version > StrictVersion('0.63.4'):
                             err = '{} is being forced, exiting.'.format(forced_version)
                             self.log.error(err)
                             print(err)
@@ -837,44 +837,44 @@ class Worker:
                         cooldown = fort.get('cooldown_complete_timestamp_ms')
                         if not cooldown or time() > cooldown / 1000:
                             await self.spin_pokestop(pokestop)
-                else:
-                    fort['name'] = ""    
-                    if not self.normalize_gym(fort) in FORT_CACHE:
-                        request = self.api.create_request()
-                        request.get_gym_details(gym_id=fort['id'],
-                                                player_latitude=self.location[0],
-                                                player_longitude=self.location[1],
-                                                gym_latitude=fort['latitude'],
-                                                gym_longitude=fort['longitude']
-                                                )
-                        responses = await self.call(request, action=0.5)
+                #else:
+                #    fort['name'] = ""    
+                #    if not self.normalize_gym(fort) in FORT_CACHE:
+                #        request = self.api.create_request()
+                #        request.get_gym_details(gym_id=fort['id'],
+                #                                player_latitude=self.location[0],
+                #                                player_longitude=self.location[1],
+                #                                gym_latitude=fort['latitude'],
+                #                                gym_longitude=fort['longitude']
+                #                                )
+                #        responses = await self.call(request, action=0.5)
 
-                        result = responses.get('GET_GYM_DETAILS', {}).get('result', 0)
-                        if result == 1:
-                            self.log.info('Get Gym Detail #{}.', fort['id'])
-                            try:
-                                get_gym_details = responses['GET_GYM_DETAILS']
-                                fort['name'] = get_gym_details['name']
-                                db_proc.add(self.normalize_gym(fort))
-                                for member in get_gym_details['gym_state']['memberships']:
-                                    rowDetail = {}
-                                    rowDetail['id'] = fort['id']
-                                    rowDetail['player_name'] = member['trainer_public_profile']['name']
-                                    rowDetail['player_level'] = member['trainer_public_profile']['level']
-                                    rowDetail['pokemon_id'] = member['pokemon_data']['pokemon_id']
-                                    rowDetail['pokemon_cp'] = member['pokemon_data']['cp']
-                                    rowDetail['weight'] = member['pokemon_data'].get('weight_kg')
-                                    rowDetail['height'] = member['pokemon_data'].get('height_m')
-                                    rowDetail['upgrades'] = member['pokemon_data'].get('num_upgrades', 0)
-                                    rowDetail['iv'] = member['pokemon_data'].get('individual_defense', 0)+member['pokemon_data'].get('individual_stamina', 0)+member['pokemon_data'].get('individual_attack', 0)
-                                    rowDetail['move1'] = member['pokemon_data'].get('move_1')
-                                    rowDetail['move2'] = member['pokemon_data'].get('move_2')
-                                    rowDetail['last_modified_timestamp_ms'] = fort['last_modified_timestamp_ms']
-                                    db_proc.add(self.normalize_gym_detail(rowDetail))
-                            except KeyError:
-                                self.log.error('Missing Gym Detail response.')
-                        else :
-                            self.log.warning('Failed getting Gym Detail {} : {}', fort['id'],result)
+                #        result = responses.get('GET_GYM_DETAILS', {}).get('result', 0)
+                #        if result == 1:
+                #            self.log.info('Get Gym Detail #{}.', fort['id'])
+                #            try:
+                #                get_gym_details = responses['GET_GYM_DETAILS']
+                #                fort['name'] = get_gym_details['name']
+                #                db_proc.add(self.normalize_gym(fort))
+                #                for member in get_gym_details['gym_state']['memberships']:
+                #                    rowDetail = {}
+                #                    rowDetail['id'] = fort['id']
+                #                    rowDetail['player_name'] = member['trainer_public_profile']['name']
+                #                    rowDetail['player_level'] = member['trainer_public_profile']['level']
+                #                    rowDetail['pokemon_id'] = member['pokemon_data']['pokemon_id']
+                #                    rowDetail['pokemon_cp'] = member['pokemon_data']['cp']
+                #                    rowDetail['weight'] = member['pokemon_data'].get('weight_kg')
+                #                    rowDetail['height'] = member['pokemon_data'].get('height_m')
+                #                    rowDetail['upgrades'] = member['pokemon_data'].get('num_upgrades', 0)
+                #                    rowDetail['iv'] = member['pokemon_data'].get('individual_defense', 0)+member['pokemon_data'].get('individual_stamina', 0)+member['pokemon_data'].get('individual_attack', 0)
+                #                    rowDetail['move1'] = member['pokemon_data'].get('move_1')
+                #                    rowDetail['move2'] = member['pokemon_data'].get('move_2')
+                #                    rowDetail['last_modified_timestamp_ms'] = fort['last_modified_timestamp_ms']
+                #                    db_proc.add(self.normalize_gym_detail(rowDetail))
+                #            except KeyError:
+                #                self.log.error('Missing Gym Detail response.')
+                #        else :
+                #            self.log.warning('Failed getting Gym Detail {} : {}', fort['id'],result)
 
             if more_points:
                 try:

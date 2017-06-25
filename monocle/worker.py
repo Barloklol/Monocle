@@ -825,7 +825,7 @@ class Worker:
                             self.smart_throttle(2))):
                         cooldown = fort.cooldown_complete_timestamp_ms
                         if not cooldown or time() > cooldown / 1000:
-                            await self.spin_pokestop(pokestop)
+                            await self.spin_pokestop(fort)
                 #else:
                 #    fort['name'] = ""    
                 #    if not self.normalize_gym(fort) in FORT_CACHE:

@@ -70,12 +70,18 @@ class Worker:
     sim_semaphore = Semaphore(conf.SIMULTANEOUS_SIMULATION, loop=LOOP)
 
     multiproxy = False
-    if conf.PROXIES:
-        if len(conf.PROXIES) > 1:
+    if conf.POKEMON_PROXIES:
+        if len(conf.POKEMON_PROXIES) > 1:
             multiproxy = True
-        proxies = cycle(conf.PROXIES)
+        pokemon_proxies = cycle(conf.POKEMON_PROXIES)
     else:
-        proxies = None
+        pokemon_proxies = None
+
+    # Niantic-domain proxies.
+    if conf.NIANTIC_PROXIES:
+        niantic_proxies = cycle(conf.NIANTIC_PROXIES)
+    else:
+        niantic_proxies = None
 
     if conf.NOTIFY:
         notifier = Notifier()
@@ -134,8 +140,10 @@ class Worker:
 
         self.api = PGoApi(device_info=device_info)
         self.api.set_position(*self.location, self.altitude)
-        if self.proxies:
-            self.api.proxy = next(self.proxies)
+        if self.pokemon_proxies:
+            self.api.pokemon_proxy = next(self.pokemon_proxies)
+        if self.niantic_proxies:
+            self.api.niantic_proxy = next(self.niantic_proxies)
         try:
             if self.account['provider'] == 'ptc' and 'auth' in self.account:
                 self.api.auth_provider = AuthPtc(username=self.username, password=self.account['password'], timeout=conf.LOGIN_TIMEOUT)
@@ -147,9 +155,14 @@ class Worker:
             pass
 
     def swap_proxy(self):
-        proxy = self.api.proxy
-        while proxy == self.api.proxy:
-            self.api.proxy = next(self.proxies)
+        pokemon_proxy = self.api.pokemon_proxy
+        niantic_proxy = self.api.niantic_proxy
+
+        while pokemon_proxy == self.api.pokemon_proxy:
+            self.api.pokemon_proxy = next(self.pokemon_proxies)
+
+        while niantic_proxy == self.api.niantic_proxy:
+            self.api.niantic_proxy = next(self.niantic_proxies)
 
     async def login(self, reauth=False):
         """Logs worker in and prepares for scanning"""
@@ -689,7 +702,7 @@ class Worker:
         except ex.NianticIPBannedException:
             self.error_code = 'IP BANNED'
             if self.multiproxy:
-                self.log.warning('Swapping out {} due to IP ban.', self.api.proxy)
+                self.log.warning('Swapping out {} due to IP ban.', self.api.niantic_proxy)
                 self.swap_proxy()
             else:
                 self.log.error('IP banned.')
@@ -844,7 +857,7 @@ class Worker:
                             db_proc.add(normalized_raid)
 
                 #else:
-                #    fort['name'] = ""    
+                #    fort['name'] = ""
                 #    if not self.normalize_gym(fort) in FORT_CACHE:
                 #        request = self.api.create_request()
                 #        request.get_gym_details(gym_id=fort['id'],

@@ -822,39 +822,39 @@ class Worker:
                 db_proc.add(normalized)
 
             for fort in map_cell.forts:
-                if not fort.enabled:
-                    continue
-                forts_seen += 1
-                if fort.type == 1:  # pokestops
-                    if fort.HasField('lure_info'):
-                        norm = self.normalize_lured(fort, request_time_ms)
-                        pokemon_seen += 1
-                        if norm not in SIGHTING_CACHE:
-                            db_proc.add(norm)
-                    if (self.pokestops and
-                            self.bag_items < self.item_capacity
-                            and time() > self.next_spin
-                            and (not conf.SMART_THROTTLE or
-                            self.smart_throttle(2))):
-                        cooldown = fort.cooldown_complete_timestamp_ms
-                        if not cooldown or time() > cooldown / 1000:
-                            await self.spin_pokestop(fort)
-                    if fort.id not in FORT_CACHE.pokestops:
-                        pokestop = self.normalize_pokestop(fort)
-                        db_proc.add(pokestop)
-                else:
-                    if fort not in FORT_CACHE:
-                        db_proc.add(self.normalize_gym(fort))
-                    if fort.HasField('raid_info'):
-                        raid_info = fort.raid_info
-                        normalized_raid = self.normalize_raid(fort)
-                        if raid_info.HasField('raid_pokemon'):
-                            normalized_raid['pokemon_id'] = raid_info.raid_pokemon.pokemon_id
-                            normalized_raid['cp'] = raid_info.raid_pokemon.cp
-                            normalized_raid['move_1'] = raid_info.raid_pokemon.move_1
-                            normalized_raid['move_2'] = raid_info.raid_pokemon.move_2
-                        if normalized_raid not in RAID_CACHE:
-                            db_proc.add(normalized_raid)
+                #if not fort.enabled:
+                #    continue
+                #forts_seen += 1
+                #if fort.type == 1:  # pokestops
+                #    if fort.HasField('lure_info'):
+                #        norm = self.normalize_lured(fort, request_time_ms)
+                #        pokemon_seen += 1
+                #        if norm not in SIGHTING_CACHE:
+                #            db_proc.add(norm)
+                #    if (self.pokestops and
+                #            self.bag_items < self.item_capacity
+                #            and time() > self.next_spin
+                #            and (not conf.SMART_THROTTLE or
+                #            self.smart_throttle(2))):
+                #        cooldown = fort.cooldown_complete_timestamp_ms
+                #        if not cooldown or time() > cooldown / 1000:
+                #            await self.spin_pokestop(fort)
+                #    if fort.id not in FORT_CACHE.pokestops:
+                #        pokestop = self.normalize_pokestop(fort)
+                #        db_proc.add(pokestop)
+                #else:
+                #    if fort not in FORT_CACHE:
+                #        db_proc.add(self.normalize_gym(fort))
+                #    if fort.HasField('raid_info'):
+                #        raid_info = fort.raid_info
+                #        normalized_raid = self.normalize_raid(fort)
+                #        if raid_info.HasField('raid_pokemon'):
+                #            normalized_raid['pokemon_id'] = raid_info.raid_pokemon.pokemon_id
+                #            normalized_raid['cp'] = raid_info.raid_pokemon.cp
+                #            normalized_raid['move_1'] = raid_info.raid_pokemon.move_1
+                #            normalized_raid['move_2'] = raid_info.raid_pokemon.move_2
+                #        if normalized_raid not in RAID_CACHE:
+                #            db_proc.add(normalized_raid)
 
                 #else:
                 #    fort['name'] = ""

@@ -822,8 +822,8 @@ class Worker:
                 db_proc.add(normalized)
 
             for fort in map_cell.forts:
-                #if not fort.enabled:
-                #    continue
+                if not fort.enabled:
+                    continue
                 #forts_seen += 1
                 #if fort.type == 1:  # pokestops
                 #    if fort.HasField('lure_info'):

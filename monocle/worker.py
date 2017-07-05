@@ -721,7 +721,7 @@ class Worker:
             self.error_code = 'KEY EXPIRED'
             err = str(e)
             self.log.error(err)
-            print(err)
+            #print(err)
             #exit()
             await sleep(5, loop=LOOP)
         except (ex.MalformedResponseException, ex.UnexpectedResponseException) as e:

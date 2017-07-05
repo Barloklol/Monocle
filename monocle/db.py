@@ -322,6 +322,7 @@ class Fort(Base):
 
     id = Column(Integer, primary_key=True)
     external_id = Column(String(35), unique=True)
+    name = Column(String(255))
     lat = Column(FLOAT_TYPE)
     lon = Column(FLOAT_TYPE)
 
@@ -329,6 +330,12 @@ class Fort(Base):
         'FortSighting',
         backref='fort',
         order_by='FortSighting.last_modified'
+    )
+   
+    members = relationship(
+        'FortMember',
+        backref='fort',
+        order_by='FortMember.last_modified'
     )
 
     raids = relationship(
@@ -343,7 +350,6 @@ class FortSighting(Base):
 
     id = Column(Integer, primary_key=True)
     fort_id = Column(Integer, ForeignKey('forts.id'))
-    name = Column(String(100), index=True)
     last_modified = Column(Integer, index=True)
     team = Column(TINY_TYPE)
     is_in_battle = Column(TINY_TYPE, default=0)
@@ -356,6 +362,31 @@ class FortSighting(Base):
             'fort_id',
             'last_modified',
             name='fort_id_last_modified_unique'
+        ),
+    )
+
+class FortMember(Base):
+    __tablename__ = 'fort_members'
+
+    id = Column(Integer, primary_key=True)
+    fort_id = Column(Integer, ForeignKey('forts.id'))
+    last_modified = Column(Integer, index=True)
+    player_name = Column(String(100), index=True)
+    player_level = Column(TINY_TYPE)
+    pokemon_id = Column(TINY_TYPE)
+    pokemon_cp = Column(SmallInteger)
+    move_1 = Column(SmallInteger)
+    move_2 = Column(SmallInteger)
+    individual_attack = Column(TINY_TYPE)
+    individual_defense = Column(TINY_TYPE)
+    individual_stamina = Column(TINY_TYPE)
+    time_deploy = Column(Integer)
+    __table_args__ = (
+        UniqueConstraint(
+            'fort_id',
+            'player_name',
+            'last_modified',
+            name='fort_last_modif_name_unique'
         ),
     )
 
@@ -541,6 +572,7 @@ def add_fort_sighting(session, raw_fort):
     if not fort:
         fort = Fort(
             external_id=raw_fort['external_id'],
+            name=raw_fort['name'],
             lat=raw_fort['lat'],
             lon=raw_fort['lon'],
         )
@@ -554,7 +586,6 @@ def add_fort_sighting(session, raw_fort):
         return
     obj = FortSighting(
         fort=fort,
-        #name=raw_fort['name'],
         team=raw_fort['team'],
         guard_pokemon_id=raw_fort['guard_pokemon_id'],
         last_modified=raw_fort['last_modified'],
@@ -564,6 +595,36 @@ def add_fort_sighting(session, raw_fort):
     )
     session.add(obj)
     FORT_CACHE.add(raw_fort)
+
+
+def add_fort_member(session, raw_fort_member):
+    # Check if raid exists
+    fort = session.query(Fort) \
+        .filter(Fort.external_id == raw_fort_member['external_id']) \
+        .first()
+    if fort and session.query(FortMember) \
+        .filter(FortMember.fort_id == fort.id) \
+        .filter(FortMember.player_name == raw_fort_member['player_name']) \
+        .filter(FortMember.last_modified == raw_fort_member['last_modified']) \
+        .first():
+        return
+    else:
+        obj = FortMember(
+            fort=fort,
+            player_name=raw_fort_member['player_name'],
+            player_level=raw_fort_member['player_level'],
+            pokemon_id=raw_fort_member['pokemon_id'],
+            pokemon_cp=raw_fort_member['pokemon_cp'],
+            move_1=raw_fort_member['move_1'],
+            move_2=raw_fort_member['move_2'],
+            individual_attack=raw_fort_member['individual_attack'],
+            individual_defense=raw_fort_member['individual_defense'],
+            individual_stamina=raw_fort_member['individual_stamina'],
+            time_deploy=raw_fort_member['time_deploy'],
+            last_modified=raw_fort_member['last_modified']
+        )
+        session.add(obj)
+
 
 def add_raid_sighting(session, raw_raid):
     # Check if raid exists
@@ -671,7 +732,8 @@ def _get_forts_sqlite(session):
             fs.slots_available,
             fs.time_ocuppied,
             f.lat,
-            f.lon
+            f.lon,
+            f.name
         FROM fort_sightings fs
         JOIN forts f ON f.id=fs.fort_id
         WHERE fs.fort_id || '-' || fs.last_modified IN (
@@ -694,7 +756,8 @@ def _get_forts(session):
             fs.slots_available,
             fs.time_ocuppied,
             f.lat,
-            f.lon
+            f.lon,
+            f.name
         FROM fort_sightings fs
         JOIN forts f ON f.id=fs.fort_id
         WHERE (fs.fort_id, fs.last_modified) IN (

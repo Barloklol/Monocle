@@ -829,7 +829,7 @@ class Worker:
                 forts_seen += 1
                 if fort.type == 1:  # pokestops
                     if fort.HasField('lure_info'):
-                       norm = self.normalize_lured(fort, request_time_ms)
+                        norm = self.normalize_lured(fort, request_time_ms)
                         pokemon_seen += 1
                         if norm not in SIGHTING_CACHE:
                             db_proc.add(norm)

@@ -11,7 +11,7 @@ from aiopogo.auth_ptc import AuthPtc
 from cyrandom import choice, randint, uniform
 from pogeo import get_distance
 
-from .db import FORT_CACHE, MYSTERY_CACHE, SIGHTING_CACHE, RAID_CACHE
+from .db import FORT_CACHE, RAID_CACHE, MYSTERY_CACHE, SIGHTING_CACHE
 from .utils import round_coords, load_pickle, get_device_info, get_start_coords, Units, randomize_point
 from .shared import get_logger, LOOP, SessionManager, run_threaded, ACCOUNTS
 from . import altitudes, avatar, bounds, db_proc, spawns, sanitized as conf
@@ -824,76 +824,49 @@ class Worker:
             for fort in map_cell.forts:
                 if not fort.enabled:
                     continue
-                #forts_seen += 1
-                #if fort.type == 1:  # pokestops
-                #    if fort.HasField('lure_info'):
-                #        norm = self.normalize_lured(fort, request_time_ms)
-                #        pokemon_seen += 1
-                #        if norm not in SIGHTING_CACHE:
-                #            db_proc.add(norm)
-                #    if (self.pokestops and
-                #            self.bag_items < self.item_capacity
-                #            and time() > self.next_spin
-                #            and (not conf.SMART_THROTTLE or
-                #            self.smart_throttle(2))):
-                #        cooldown = fort.cooldown_complete_timestamp_ms
-                #        if not cooldown or time() > cooldown / 1000:
-                #            await self.spin_pokestop(fort)
-                #    if fort.id not in FORT_CACHE.pokestops:
-                #        pokestop = self.normalize_pokestop(fort)
-                #        db_proc.add(pokestop)
-                #else:
-                #    if fort not in FORT_CACHE:
-                #        db_proc.add(self.normalize_gym(fort))
-                #    if fort.HasField('raid_info'):
-                #        raid_info = fort.raid_info
-                #        normalized_raid = self.normalize_raid(fort)
-                #        if raid_info.HasField('raid_pokemon'):
-                #            normalized_raid['pokemon_id'] = raid_info.raid_pokemon.pokemon_id
-                #            normalized_raid['cp'] = raid_info.raid_pokemon.cp
-                #            normalized_raid['move_1'] = raid_info.raid_pokemon.move_1
-                #            normalized_raid['move_2'] = raid_info.raid_pokemon.move_2
-                #        if normalized_raid not in RAID_CACHE:
-                #            db_proc.add(normalized_raid)
-
-                #else:
-                #    fort['name'] = ""
-                #    if not self.normalize_gym(fort) in FORT_CACHE:
-                #        request = self.api.create_request()
-                #        request.get_gym_details(gym_id=fort['id'],
-                #                                player_latitude=self.location[0],
-                #                                player_longitude=self.location[1],
-                #                                gym_latitude=fort['latitude'],
-                #                                gym_longitude=fort['longitude']
-                #                                )
-                #        responses = await self.call(request, action=0.5)
-
-                #        result = responses.get('GET_GYM_DETAILS', {}).get('result', 0)
-                #        if result == 1:
-                #            self.log.info('Get Gym Detail #{}.', fort['id'])
-                #            try:
-                #                get_gym_details = responses['GET_GYM_DETAILS']
-                #                fort['name'] = get_gym_details['name']
-                #                db_proc.add(self.normalize_gym(fort))
-                #                for member in get_gym_details['gym_state']['memberships']:
-                #                    rowDetail = {}
-                #                    rowDetail['id'] = fort['id']
-                #                    rowDetail['player_name'] = member['trainer_public_profile']['name']
-                #                    rowDetail['player_level'] = member['trainer_public_profile']['level']
-                #                    rowDetail['pokemon_id'] = member['pokemon_data']['pokemon_id']
-                #                    rowDetail['pokemon_cp'] = member['pokemon_data']['cp']
-                #                    rowDetail['weight'] = member['pokemon_data'].get('weight_kg')
-                #                    rowDetail['height'] = member['pokemon_data'].get('height_m')
-                #                    rowDetail['upgrades'] = member['pokemon_data'].get('num_upgrades', 0)
-                #                    rowDetail['iv'] = member['pokemon_data'].get('individual_defense', 0)+member['pokemon_data'].get('individual_stamina', 0)+member['pokemon_data'].get('individual_attack', 0)
-                #                    rowDetail['move1'] = member['pokemon_data'].get('move_1')
-                #                    rowDetail['move2'] = member['pokemon_data'].get('move_2')
-                #                    rowDetail['last_modified_timestamp_ms'] = fort['last_modified_timestamp_ms']
-                #                    db_proc.add(self.normalize_gym_detail(rowDetail))
-                #            except KeyError:
-                #                self.log.error('Missing Gym Detail response.')
-                #        else :
-                #            self.log.warning('Failed getting Gym Detail {} : {}', fort['id'],result)
+                forts_seen += 1
+                if fort.type == 1:  # pokestops
+                    if fort.HasField('lure_info'):
+                       norm = self.normalize_lured(fort, request_time_ms)
+                        pokemon_seen += 1
+                        if norm not in SIGHTING_CACHE:
+                            db_proc.add(norm)
+                    if (self.pokestops and
+                            self.bag_items < self.item_capacity
+                            and time() > self.next_spin
+                            and (not conf.SMART_THROTTLE or
+                            self.smart_throttle(2))):
+                        cooldown = fort.cooldown_complete_timestamp_ms
+                        if not cooldown or time() > cooldown / 1000:
+                            await self.spin_pokestop(fort)
+                    if fort.id not in FORT_CACHE.pokestops:
+                        pokestop = self.normalize_pokestop(fort)
+                        db_proc.add(pokestop)
+                else:
+                    if fort not in FORT_CACHE:
+                        db_proc.add(self.normalize_gym(fort))
+                    if fort.HasField('raid_info'):
+                        fort_raid = {}
+                        fort_raid['external_id'] = fort.id
+                        fort_raid['raid_seed'] = fort.raid_info.raid_seed
+                        fort_raid['raid_battle_ms'] = fort.raid_info.raid_battle_ms
+                        fort_raid['raid_spawn_ms'] = fort.raid_info.raid_spawn_ms
+                        fort_raid['raid_end_ms'] = fort.raid_info.raid_end_ms
+                        fort_raid['raid_level'] = fort.raid_info.raid_level
+                        fort_raid['complete'] = fort.raid_info.complete
+                        fort_raid['pokemon_id'] = None
+                        fort_raid['cp'] = None
+                        fort_raid['move_1'] = None
+                        fort_raid['move_2'] = None
+                        if fort.raid_info.HasField('raid_pokemon'):
+                            fort_raid['pokemon_id'] = fort.raid_info.raid_pokemon.pokemon_id
+                            fort_raid['cp'] = fort.raid_info.raid_pokemon.cp
+                            fort_raid['move_1'] = fort.raid_info.raid_pokemon.move_1
+                            fort_raid['move_2'] = fort.raid_info.raid_pokemon.move_2
+                      
+                        normalized_raid = self.normalize_raid(fort_raid)
+                        if normalized_raid not in RAID_CACHE:
+                            db_proc.add(normalized_raid)
 
             if more_points:
                 try:
@@ -1052,6 +1025,7 @@ class Worker:
             pokemon['individual_stamina'] = pdata.individual_stamina
             pokemon['height'] = pdata.height_m
             pokemon['weight'] = pdata.weight_kg
+            pokemon['cp'] = pdata.cp
             pokemon['gender'] = pdata.pokemon_display.gender
 
             if pokemon['pokemon_id']==129 and 'weight_kg' in pdata and 'height_m' in pdata and 'move_1' in pdata and pdata['weight_kg']>13.59 and pdata['height_m']>0.99:
@@ -1335,33 +1309,21 @@ class Worker:
         }
 
     @staticmethod
-    def normalize_gym_detail(raw):
-        return {
-            'type': 'fort_detail',
-            'external_id': raw['id'],
-            'player_name': raw['player_name'],
-            'player_level': raw['player_level'],
-            'pokemon_id': raw['pokemon_id'],
-            'pokemon_cp': raw['pokemon_cp'],
-            'weight': raw['weight'],
-            'height': raw['height'],
-            'upgrades': raw['upgrades'],
-            'iv': raw['iv'],
-            'move1': raw['move1'],
-            'move2': raw['move2'],
-        }
-
-    @staticmethod
     def normalize_raid(raw):
-        raid = raw.raid_info
         return {
-            'type': 'raidinfo',
-            'external_id': raw.id,
-            'raid_seed': raid.raid_seed,
-            'raid_level': raid.raid_level,
-            'raid_spawn': raid.raid_spawn_ms // 1000,
-            'raid_start': raid.raid_battle_ms // 1000,
-            'raid_end': raid.raid_end_ms // 1000
+            'type': 'raid',
+            'external_id': raw['external_id'],
+            'raid_seed': raw['raid_seed'],
+            'raid_battle_ms': raw['raid_battle_ms'] // 1000,
+            'raid_spawn_ms': raw['raid_spawn_ms'] // 1000,
+            'raid_end_ms': raw['raid_end_ms'] // 1000,
+            'raid_level': raw['raid_level'],
+            'complete': raw['complete'],
+            'pokemon_id': raw['pokemon_id'],
+            'cp': raw['cp'],
+            'move_1': raw['move_1'],
+            'move_2': raw['move_2'],
+            # 'last_modified': raw.last_modified_timestamp_ms // 1000,
         }
 
     @staticmethod

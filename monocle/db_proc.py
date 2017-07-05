@@ -47,10 +47,8 @@ class DatabaseProcessor(Thread):
                     self.count += 1
                 elif item_type == 'fort':
                     db.add_fort_sighting(session, item)
-                elif item_type == 'raidinfo':
-                    db.add_raid_info(session, item)
-                elif item['type'] == 'fort_detail':
-                    db.add_fort_detail_sighting(session, item)
+                elif item_type == 'raid':
+                    db.add_raid_sighting(session, item)
                 elif item['type'] == 'pokestop':
                     db.add_pokestop(session, item)
                 elif item_type == 'target':

@@ -237,7 +237,7 @@ RAID_CACHE = RaidCache()
 
 Base = declarative_base()
 
-_engine = create_engine(conf.DB_ENGINE)
+_engine = create_engine(conf.DB_ENGINE, connect_args={'charset':'utf8mb4'})
 Session = sessionmaker(bind=_engine)
 DB_TYPE = _engine.name
 

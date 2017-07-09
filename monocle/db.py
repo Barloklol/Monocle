@@ -642,7 +642,7 @@ def add_raid_sighting(session, raw_raid):
         if raid and raid.pokemon_id == None and raw_raid['pokemon_id'] != None:
             update_raid(session,raw_raid)
         if fort.id and session.query(exists().where(and_(
-                    RaidSighting.fort_id == fort.id,
+                    RaidSighting.fort_id == raw_fort['external_id'],
                     RaidSighting.raid_spawn_ms == raw_raid['raid_spawn_ms']
                 ))).scalar():
             # Why is it not in the cache? It should be there!

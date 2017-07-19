@@ -11,7 +11,7 @@ import sys
 from aiopogo import HashServer
 from sqlalchemy.exc import OperationalError
 
-from .db import SIGHTING_CACHE, MYSTERY_CACHE
+from .db import SIGHTING_CACHE, MYSTERY_CACHE, FORT_MEMBER_CACHE
 from .utils import get_current_hour, dump_pickle, get_start_coords, get_bootstrap_points, randomize_point, best_factors, percentage_split
 from .shared import get_logger, LOOP, run_threaded, ACCOUNTS
 from . import bounds, db_proc, spawns, sanitized as conf

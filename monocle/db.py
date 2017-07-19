@@ -195,27 +195,6 @@ class FortCache:
         except (FileNotFoundError, TypeError, KeyError):
             pass
 
-
-class FortMemberCache(object):
-    """Simple cache for storing fort sightings"""
-    def __init__(self):
-        self.store = utils.load_pickle('forts_member') or {}
-
-    def add(self, sighting):
-        self.store[str(sighting['external_id']) + sighting['player_name']] = sighting['last_modified']
-
-    def __contains__(self, sighting):
-        existing = self.store.get(str(sighting['last_modified']) + sighting['player_name'])
-        if not existing:
-            return False
-        if existing is True:
-            return True
-        return existing == (str(sighting['last_modified']) + sighting['player_name'])
-
-    def pickle(self):
-        utils.dump_pickle('forts_member', self.store)
-
-
 class RaidCache:
     """Simple cache for storing fort raids"""
     def __init__(self):
@@ -254,7 +233,6 @@ class RaidCache:
 SIGHTING_CACHE = SightingCache()
 MYSTERY_CACHE = MysteryCache()
 FORT_CACHE = FortCache()
-FORT_MEMBER_CACHE = FortMemberCache()
 RAID_CACHE = RaidCache()
 
 Base = declarative_base()
@@ -340,7 +318,7 @@ class Spawnpoint(Base):
 
 
 class Fort(Base):
-    __tablename__ = 'forts'+    FORT_DETAIL_CACHE.add(raw_fort_detail)
+    __tablename__ = 'forts'
 
     id = Column(Integer, primary_key=True)
     external_id = Column(String(35), unique=True)
@@ -354,9 +332,10 @@ class Fort(Base):
         order_by='FortSighting.last_modified'
     )
    
-    details = relationship(
-        'FortDetail',
-        backref='fort'
+    members = relationship(
+        'FortMember',
+        backref='fort',
+        order_by='FortMember.last_modified'
     )
 
     raids = relationship(
@@ -403,13 +382,12 @@ class FortMember(Base):
     individual_defense = Column(TINY_TYPE)
     individual_stamina = Column(TINY_TYPE)
     time_deploy = Column(Integer)
-
     __table_args__ = (
         UniqueConstraint(
             'fort_id',
-            'last_modified',
             'player_name',
-            name='fort_id_last_modified_unique'
+            'last_modified',
+            name='fort_last_modif_name_unique'
         ),
     )
 
@@ -622,41 +600,32 @@ def add_fort_sighting(session, raw_fort):
 
 
 def add_fort_member(session, raw_fort_member):
-    if raw_fort_member in FORT_MEMBER_CACHE:
-        return
-
+    # Check if raid exists
     fort = session.query(Fort) \
         .filter(Fort.external_id == raw_fort_member['external_id']) \
         .first()
-    if not fort:
+    if fort and session.query(FortMember) \
+        .filter(FortMember.fort_id == fort.id) \
+        .filter(FortMember.player_name == raw_fort_member['player_name']) \
+        .filter(FortMember.last_modified == raw_fort_member['last_modified']) \
+        .first():
         return
-  
-    existing = session.query(exists().where(and_(
-        FortMember.fort_id == fort.id,
-        FortMember.last_modified == raw_fort_member['last_modified'],
-        FortMember.player_name == raw_fort_member['player_name']
-    ))).scalar()
-    if existing:
-        # Why is it not in the cache? It should be there!
-        FORT_MEMBER_CACHE.add(raw_fort_dmember)
-        return
-
-    obj = FortMember(
-        fort=fort,
-        player_name=raw_fort_member['player_name'],
-        player_level=raw_fort_member['player_level'],
-        pokemon_id=raw_fort_member['pokemon_id'],
-        pokemon_cp=raw_fort_member['pokemon_cp'],
-        move_1=raw_fort_member['move_1'],
-        move_2=raw_fort_member['move_2'],
-        individual_attack=raw_fort_member['individual_attack'],
-        individual_defense=raw_fort_member['individual_defense'],
-        individual_stamina=raw_fort_member['individual_stamina'],
-        time_deploy=raw_fort_member['time_deploy'],
-        last_modified=raw_fort_member['last_modified']
-    )
-    session.add(obj)
-    FORT_MEMBER_CACHE.add(raw_fort_member)
+    else:
+        obj = FortMember(
+            fort=fort,
+            player_name=raw_fort_member['player_name'],
+            player_level=raw_fort_member['player_level'],
+            pokemon_id=raw_fort_member['pokemon_id'],
+            pokemon_cp=raw_fort_member['pokemon_cp'],
+            move_1=raw_fort_member['move_1'],
+            move_2=raw_fort_member['move_2'],
+            individual_attack=raw_fort_member['individual_attack'],
+            individual_defense=raw_fort_member['individual_defense'],
+            individual_stamina=raw_fort_member['individual_stamina'],
+            time_deploy=raw_fort_member['time_deploy'],
+            last_modified=raw_fort_member['last_modified']
+        )
+        session.add(obj)
 
 
 def add_raid_sighting(session, raw_raid):

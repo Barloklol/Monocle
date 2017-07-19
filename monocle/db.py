@@ -355,7 +355,7 @@ class Fort(Base):
     )
    
     details = relationship(
-        'FortDetail',
+        'FortMember',
         backref='fort'
     )
 
@@ -638,7 +638,7 @@ def add_fort_member(session, raw_fort_member):
     ))).scalar()
     if existing:
         # Why is it not in the cache? It should be there!
-        FORT_MEMBER_CACHE.add(raw_fort_dmember)
+        FORT_MEMBER_CACHE.add(raw_fort_member)
         return
 
     obj = FortMember(

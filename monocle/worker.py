@@ -11,7 +11,7 @@ from aiopogo.auth_ptc import AuthPtc
 from cyrandom import choice, randint, uniform
 from pogeo import get_distance
 
-from .db import FORT_CACHE, FORT_DETAIL_CACHE, RAID_CACHE, MYSTERY_CACHE, SIGHTING_CACHE
+from .db import FORT_CACHE, RAID_CACHE, MYSTERY_CACHE, SIGHTING_CACHE
 from .utils import round_coords, load_pickle, get_device_info, get_start_coords, Units, randomize_point
 from .shared import get_logger, LOOP, SessionManager, run_threaded, ACCOUNTS
 from . import altitudes, avatar, bounds, db_proc, spawns, sanitized as conf
@@ -844,7 +844,7 @@ class Worker:
                         pokestop = self.normalize_pokestop(fort)
                         db_proc.add(pokestop)
                 else:
-                    if fort not in FORT_CACHE:
+                    if not fort in FORT_CACHE:
                         request = self.api.create_request()
                         request.gym_get_info(
                                                 gym_id=fort.id,
@@ -853,28 +853,18 @@ class Worker:
                                                 gym_lat_degrees=fort.latitude,
                                                 gym_lng_degrees=fort.longitude
                                             )
-                        responses = await self.call(request, action=1.2)
-                        try:
-                            if responses['GYM_GET_INFO'].result != 1:
-                                self.log.warning("Failed to get gym_info {}", fort.id)
-                            else:
+
+                        result = responses.get('GET_GYM_INFO', {}).get('result', 0)
+                        if result == 1:
+                            self.log.warning('Get Gym Members #{}.', fort['id'])
+                            try:
                                 gym_get_info = responses['GYM_GET_INFO']
-                                rawFort = {}
-                                rawFort['external_id'] = fort.id
-                                rawFort['name'] = gym_get_info.name
-                                rawFort['lat'] = fort.latitude
-                                rawFort['lon'] = fort.longitude
-                                rawFort['team'] = fort.owned_by_team
-                                rawFort['guard_pokemon_id'] = fort.guard_pokemon_id
-                                rawFort['last_modified'] = fort.last_modified_timestamp_ms // 1000
-                                rawFort['is_in_battle'] = fort.is_in_battle
-                                rawFort['slots_available'] = fort.gym_display.slots_available
-                                rawFort['time_ocuppied'] = fort.gym_display.occupied_millis // 1000
                                 db_proc.add(self.normalize_gym(rawFort))
 
                                 gym_members = gym_get_info.gym_status_and_defenders
-                            
+
                                 for gym_member in gym_members.gym_defender:
+                                    rowDetail = {}
                                     raw_member = {}
                                     raw_member['external_id'] = fort.id
                                     raw_member['player_name'] = gym_member.trainer_public_profile.name
@@ -889,9 +879,11 @@ class Worker:
                                     raw_member['time_deploy'] = gym_member.motivated_pokemon.deploy_ms // 1000
                                     raw_member['last_modified'] = rawFort['last_modified']
                                     db_proc.add(self.normalize_gym_member(raw_member))
-                        except KeyError:
+                            except KeyError:
+                                self.log.error('Missing Gym Info response.')
+                        else :
                             self.log.warning("Failed to get gym_info {}", fort.id)
-                            
+
                     if fort.HasField('raid_info'):
                         fort_raid = {}
                         fort_raid['external_id'] = fort.id

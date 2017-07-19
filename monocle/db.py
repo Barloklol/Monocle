@@ -340,7 +340,7 @@ class Spawnpoint(Base):
 
 
 class Fort(Base):
-    __tablename__ = 'forts'
+    __tablename__ = 'forts'+    FORT_DETAIL_CACHE.add(raw_fort_detail)
 
     id = Column(Integer, primary_key=True)
     external_id = Column(String(35), unique=True)

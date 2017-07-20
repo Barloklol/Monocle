@@ -169,7 +169,7 @@ class RaidCache:
 
     def add(self, raid):
         self.store[raid['fort_id']] = raid
-        call_at(raid['time_end'], self.remove, raid['fort_id'])
+        call_at(raid['raid_end_ms'], self.remove, raid['fort_id'])
 
     def remove(self, cache_id):
         try:
@@ -181,8 +181,8 @@ class RaidCache:
         try:
             raid = self.store[raw_fort.id]
             return (
-                raid['time_end'] > raw_fort.raid_info.raid_end_ms // 1000 - 2 and
-                raid['time_end'] < raw_fort.raid_info.raid_end_ms // 1000 + 2 and
+                raid['raid_end_ms'] > raw_fort.raid_info.raid_end_ms // 1000 - 2 and
+                raid['raid_end_ms'] < raw_fort.raid_info.raid_end_ms // 1000 + 2 and
                 raid['pokemon_id'] == raw_fort.raid_info.raid_pokemon.pokemon_id)
         except KeyError:
             return False
@@ -346,18 +346,12 @@ class Fort(Base):
         order_by='FortSighting.last_modified'
     )
 
-    raids = relationship(
-        'RaidSighting',
-        backref='fort',
-        order_by='RaidSighting.raid_spawn_ms'
-    )
 
 class FortSighting(Base):
     __tablename__ = 'fort_sightings'
 
     id = Column(Integer, primary_key=True)
     fort_id = Column(Integer, ForeignKey('forts.id'))
-    fort_name = Column(String(255))
     last_modified = Column(Integer, index=True)
     team = Column(TINY_TYPE)
     is_in_battle = Column(TINY_TYPE, default=0)
@@ -532,7 +526,7 @@ def add_fort_sighting(session, raw_fort):
     if not fort:
         fort = Fort(
             external_id=raw_fort['external_id'],
-            name=raw_fort['name'],
+            #name=raw_fort['name'],
             lat=raw_fort['lat'],
             lon=raw_fort['lon'],
         )
@@ -546,7 +540,7 @@ def add_fort_sighting(session, raw_fort):
         return
     obj = FortSighting(
         fort=fort,
-        fort_name=raw_fort['name'],
+        #fort_name=raw_fort['name'],
         team=raw_fort['team'],
         guard_pokemon_id=raw_fort['guard_pokemon_id'],
         last_modified=raw_fort['last_modified'],
@@ -583,11 +577,11 @@ def add_raid(session, raw_raid):
         raid = Raid(
             external_id=raw_raid['external_id'],
             fort_id=fort.id,
-            raid_level=raw_raid['level'],
+            raid_level=raw_raid['raid_level'],
             pokemon_id=raw_raid['pokemon_id'],
-            raid_spawn_ms=raw_raid['time_spawn'],
-            raid_battle_ms=raw_raid['time_battle'],
-            raid_end_ms=raw_raid['time_end'],
+            raid_spawn_ms=raw_raid['raid_spawn_ms'],
+            raid_battle_ms=raw_raid['raid_battle_ms'],
+            raid_end_ms=raw_raid['raid_end_ms'],
             cp=raw_raid['cp'],
             move_1=raw_raid['move_1'],
             move_2=raw_raid['move_2']

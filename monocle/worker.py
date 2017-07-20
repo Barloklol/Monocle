@@ -1279,16 +1279,16 @@ class Worker:
     def normalize_gym(raw):
         return {
             'type': 'fort',
-            'external_id': raw['external_id'],
-            'name': raw['name'],
-            'lat': raw['lat'],
-            'lon': raw['lon'],
-            'team': raw['team'],
-            'guard_pokemon_id': raw['guard_pokemon_id'],
-            'last_modified': raw['last_modified'],
-            'is_in_battle': raw['is_in_battle'],
-            'slots_available': raw['slots_available'],
-            'time_ocuppied': raw['time_ocuppied']
+            'external_id': raw.id,
+            #'name': raw.gym_get_info.name,
+            'lat': raw.latitude,
+            'lon': raw.longitude,
+            'team': raw.owned_by_team,
+            'guard_pokemon_id': raw.guard_pokemon_id,
+            'last_modified': raw.last_modified_timestamp_ms // 1000,
+            'is_in_battle': raw.is_in_battle,
+            'slots_available':  raw.gym_display.slots_available,
+            'time_ocuppied': raw.gym_display.occupied_millis // 1000
         }
 
     @staticmethod

@@ -11,7 +11,7 @@ from aiopogo.auth_ptc import AuthPtc
 from cyrandom import choice, randint, uniform
 from pogeo import get_distance
 
-from .db import FORT_CACHE, RAID_CACHE, MYSTERY_CACHE, SIGHTING_CACHE
+from .db import FORT_CACHE, MYSTERY_CACHE, SIGHTING_CACHE, RAID_CACHE
 from .utils import round_coords, load_pickle, get_device_info, get_start_coords, Units, randomize_point
 from .shared import get_logger, LOOP, SessionManager, run_threaded, ACCOUNTS
 from . import altitudes, avatar, bounds, db_proc, spawns, sanitized as conf
@@ -845,74 +845,11 @@ class Worker:
                         db_proc.add(pokestop)
                 else:
                     if fort not in FORT_CACHE:
-                        request = self.api.create_request()
-                        request.gym_get_info(
-                                                gym_id=fort.id,
-                                                player_lat_degrees = self.location[0],
-                                                player_lng_degrees = self.location[1],
-                                                gym_lat_degrees=fort.latitude,
-                                                gym_lng_degrees=fort.longitude
-                                            )
-                        responses = await self.call(request, action=1.2)
-                        try:
-                            if responses['GYM_GET_INFO'].result != 1:
-                                self.log.warning("Failed to get gym_info {}", fort.id)
-                            else:
-                                gym_get_info = responses['GYM_GET_INFO']
-                                rawFort = {}
-                                rawFort['external_id'] = fort.id
-                                rawFort['name'] = gym_get_info.name
-                                rawFort['lat'] = fort.latitude
-                                rawFort['lon'] = fort.longitude
-                                rawFort['team'] = fort.owned_by_team
-                                rawFort['guard_pokemon_id'] = fort.guard_pokemon_id
-                                rawFort['last_modified'] = fort.last_modified_timestamp_ms // 1000
-                                rawFort['is_in_battle'] = fort.is_in_battle
-                                rawFort['slots_available'] = fort.gym_display.slots_available
-                                rawFort['time_ocuppied'] = fort.gym_display.occupied_millis // 1000
-                                db_proc.add(self.normalize_gym(rawFort))
-
-                                gym_members = gym_get_info.gym_status_and_defenders
-                            
-                                for gym_member in gym_members.gym_defender:
-                                    raw_member = {}
-                                    raw_member['external_id'] = fort.id
-                                    raw_member['player_name'] = gym_member.trainer_public_profile.name
-                                    raw_member['player_level'] = gym_member.trainer_public_profile.level
-                                    raw_member['pokemon_id'] = gym_member.motivated_pokemon.pokemon.pokemon_id
-                                    raw_member['pokemon_cp'] = gym_member.motivated_pokemon.pokemon.cp
-                                    raw_member['move_1'] = gym_member.motivated_pokemon.pokemon.move_1
-                                    raw_member['move_2'] = gym_member.motivated_pokemon.pokemon.move_2
-                                    raw_member['individual_attack'] = gym_member.motivated_pokemon.pokemon.individual_attack
-                                    raw_member['individual_defense'] = gym_member.motivated_pokemon.pokemon.individual_defense
-                                    raw_member['individual_stamina'] = gym_member.motivated_pokemon.pokemon.individual_stamina
-                                    raw_member['time_deploy'] = gym_member.motivated_pokemon.deploy_ms // 1000
-                                    raw_member['last_modified'] = rawFort['last_modified']
-                                    db_proc.add(self.normalize_gym_member(raw_member))
-                        except KeyError:
-                            self.log.warning("Failed to get gym_info {}", fort.id)
+                        normalized_fort = self.normalize_gym(fort)
+                        db_proc.add(normalized_fort)
                     if fort.HasField('raid_info'):
-                        fort_raid = {}
-                        fort_raid['external_id'] = fort.id
-                        fort_raid['raid_seed'] = fort.raid_info.raid_seed
-                        fort_raid['raid_battle_ms'] = fort.raid_info.raid_battle_ms
-                        fort_raid['raid_spawn_ms'] = fort.raid_info.raid_spawn_ms
-                        fort_raid['raid_end_ms'] = fort.raid_info.raid_end_ms
-                        fort_raid['raid_level'] = fort.raid_info.raid_level
-                        fort_raid['complete'] = fort.raid_info.complete
-                        fort_raid['pokemon_id'] = None
-                        fort_raid['cp'] = None
-                        fort_raid['move_1'] = None
-                        fort_raid['move_2'] = None
-                        if fort.raid_info.HasField('raid_pokemon'):
-                            fort_raid['pokemon_id'] = fort.raid_info.raid_pokemon.pokemon_id
-                            fort_raid['cp'] = fort.raid_info.raid_pokemon.cp
-                            fort_raid['move_1'] = fort.raid_info.raid_pokemon.move_1
-                            fort_raid['move_2'] = fort.raid_info.raid_pokemon.move_2
-                      
-                        normalized_raid = self.normalize_raid(fort_raid)
-                        if normalized_raid not in RAID_CACHE:
-                            db_proc.add(normalized_raid)
+                        if fort not in RAID_CACHE:
+                            db_proc.add(self.normalize_raid(fort))
 
             if more_points:
                 try:
@@ -1355,40 +1292,26 @@ class Worker:
         }
 
     @staticmethod
-    def normalize_gym_member(raw):
-        return {
-            'type': 'fort_member',
-            'external_id' : raw['external_id'],
-            'player_name' : raw['player_name'],
-            'player_level' : raw['player_level'],
-            'pokemon_id' : raw['pokemon_id'],
-            'pokemon_cp' : raw['pokemon_cp'],
-            'move_1' : raw['move_1'],
-            'move_2' : raw['move_2'],
-            'individual_attack' : raw['individual_attack'],
-            'individual_defense' : raw['individual_defense'],
-            'individual_stamina' : raw['individual_stamina'],
-            'time_deploy' : raw['time_deploy'],
-            'last_modified' : raw['last_modified']
-        }
-
-    @staticmethod
     def normalize_raid(raw):
-        return {
+        obj = {
             'type': 'raid',
-            'external_id': raw['external_id'],
-            'raid_seed': raw['raid_seed'],
-            'raid_battle_ms': raw['raid_battle_ms'] // 1000,
-            'raid_spawn_ms': raw['raid_spawn_ms'] // 1000,
-            'raid_end_ms': raw['raid_end_ms'] // 1000,
-            'raid_level': raw['raid_level'],
-            'complete': raw['complete'],
-            'pokemon_id': raw['pokemon_id'],
-            'cp': raw['cp'],
-            'move_1': raw['move_1'],
-            'move_2': raw['move_2'],
-            # 'last_modified': raw.last_modified_timestamp_ms // 1000,
+            'external_id': raw.raid_info.raid_seed,
+            'fort_id': raw.id,
+            'raid_level': raw.raid_info.raid_level,
+            'pokemon_id': 0,
+            'raid_spawn_ms': raw.raid_info.raid_spawn_ms // 1000,
+            'raid_battle_ms': raw.raid_info.raid_battle_ms // 1000,
+            'raid_end_ms': raw.raid_info.raid_end_ms // 1000,
+            'cp': 0,
+            'move_1': 0,
+            'move_2': 0,
         }
+        if raw.raid_info.HasField('raid_pokemon'):
+            obj['pokemon_id'] = raw.raid_info.raid_pokemon.pokemon_id
+            obj['cp'] = raw.raid_info.raid_pokemon.cp
+            obj['move_1'] = raw.raid_info.raid_pokemon.move_1
+            obj['move_2'] = raw.raid_info.raid_pokemon.move_2
+        return obj
 
     @staticmethod
     def normalize_pokestop(raw):
